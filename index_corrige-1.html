@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skate Rush</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;background:#111;font-family:Arial,sans-serif;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;background:linear-gradient(#75c9ff 0 58%,#d8d8d8 58% 100%)}
+  #info{position:fixed;top:12px;left:12px;color:white;font-weight:bold;font-size:20px;text-shadow:2px 2px #000}
+  #start{position:fixed;inset:0;display:grid;place-items:center;background:#0008;color:white}
+  #panel{background:#111d;padding:28px;border:2px solid #fff;border-radius:18px;text-align:center}
+  button{font-size:22px;padding:12px 25px;border:0;border-radius:12px;cursor:pointer}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="info">⭐ Score: <span id="score">0</span> &nbsp; ❤️ <span id="lives">3</span></div>
+<button id="jumpBtn" onclick="jump()" style="position:fixed;right:20px;bottom:20px;z-index:5;font-size:20px;padding:14px 20px;border:0;border-radius:14px;background:#fff;color:#111;font-weight:bold">⬆️ SAUTER</button>
+<div id="start"><div id="panel"><h1>🛹 SKATE RUSH</h1><p>← → pour bouger • Espace pour sauter</p><button onclick="startGame()">JOUER</button></div></div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');
+let W,H,player,obs,coins,score,lives,running=false,speed=7,keys={};
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight} addEventListener('resize',resize);resize();
+addEventListener('keydown',e=>{keys[e.key]=true;if(e.code==='Space')e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key]=false);
+function jump(){
+  if(running && player && player.on){player.vy=-15;player.on=false}
+}
+c.addEventListener('touchstart',e=>{e.preventDefault();jump()},{passive:false});
+c.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')jump()});
+
+
+function startGame(){
+ document.getElementById('start').style.display='none'; score=0;lives=3;speed=7;obs=[];coins=[];
+ player={x:W*.25,y:H*.62,w:58,h:30,vy:0,on:true};
+ running=true; requestAnimationFrame(loop);
+}
+function spawn(){
+ if(Math.random()<.65) obs.push({x:W+50,y:H*.66-38,w:45,h:38});
+ else coins.push({x:W+50,y:H*(.45+Math.random()*.18),r:11});
+}
+function hit(a,b){
+  return a.x < b.x+b.w &&
+         a.x+a.w > b.x &&
+         a.y < b.y+b.h &&
+         a.y+a.h > b.y;
+}
+function loop(){
+ if(!running)return;
+ if(Math.random()<.025)spawn();
+ if(keys.ArrowLeft)player.x-=7;if(keys.ArrowRight)player.x+=7;
+ player.x=Math.max(20,Math.min(W-80,player.x));
+ if((keys[' ']||keys.Space)&&player.on){jump()}
+ player.vy+=.7;player.y+=player.vy;
+ const ground=H*.66-player.h;
+ if(player.y>=ground){player.y=ground;player.vy=0;player.on=true}
+ obs.forEach(o=>o.x-=speed);coins.forEach(q=>q.x-=speed);
+ for(let i=obs.length-1;i>=0;i--){
+   let o=obs[i]; if(o.x+o.w<0)obs.splice(i,1);
+   else {
+     const playerHitbox={x:player.x+10,y:player.y+6,w:38,h:22};
+     const obstacleHitbox={x:o.x+4,y:o.y+2,w:o.w-8,h:o.h-4};
+     if(hit(playerHitbox,obstacleHitbox)){
+       obs.splice(i,1);
+       lives--;
+       if(lives<=0)return gameOver();
+     }
+   }
+ }
+ for(let i=coins.length-1;i>=0;i--){
+   let q=coins[i];let dx=player.x+player.w/2-q.x,dy=player.y+player.h/2-q.y;
+   if(Math.hypot(dx,dy)<35){coins.splice(i,1);score+=10}
+   else if(q.x<0)coins.splice(i,1);
+ }
+ score++; if(score%500===0)speed+=1;
+ document.getElementById('score').textContent=score;
+ document.getElementById('lives').textContent=lives;
+ draw();requestAnimationFrame(loop);
+}
+function draw(){
+ x.clearRect(0,0,W,H);
+ // city
+ x.fillStyle='#ddd';x.fillRect(0,H*.58,W,H*.08);
+ for(let i=0;i<12;i++){x.fillStyle=i%2?'#b9c3cc':'#9faab4';x.fillRect(i*120,H*.25,90,H*.33)}
+ // road
+ x.fillStyle='#444';x.fillRect(0,H*.66,W,H*.34);
+ x.strokeStyle='#fff';x.setLineDash([35,30]);x.lineWidth=5;x.beginPath();x.moveTo(0,H*.83);x.lineTo(W,H*.83);x.stroke();x.setLineDash([]);
+ // obstacles
+ obs.forEach(o=>{x.fillStyle='#e74c3c';x.fillRect(o.x,o.y,o.w,o.h);x.fillStyle='#fff';x.fillRect(o.x+8,o.y+8,o.w-16,7)});
+ coins.forEach(q=>{x.fillStyle='#ffd43b';x.beginPath();x.arc(q.x,q.y,q.r,0,Math.PI*2);x.fill();x.fillStyle='#9a6d00';x.font='bold 14px Arial';x.fillText('★',q.x-7,q.y+5)});
+ // skater
+ x.fillStyle='#222';x.fillRect(player.x+10,player.y+8,38,18);
+ x.fillStyle='#ffcc99';x.beginPath();x.arc(player.x+30,player.y-5,12,0,Math.PI*2);x.fill();
+ x.strokeStyle='#1677ff';x.lineWidth=5;x.beginPath();x.moveTo(player.x+22,player.y+20);x.lineTo(player.x+15,player.y+35);x.moveTo(player.x+38,player.y+20);x.lineTo(player.x+45,player.y+35);x.stroke();
+ x.fillStyle='#111';x.fillRect(player.x+3,player.y+34,50,5);x.fillStyle='#ddd';x.beginPath();x.arc(player.x+12,player.y+40,5,0,7);x.arc(player.x+44,player.y+40,5,0,7);x.fill();
+}
+function gameOver(){
+ running=false;document.getElementById('start').style.display='grid';
+ document.getElementById('panel').innerHTML='<h1>💥 GAME OVER</h1><p>Score : '+score+'</p><button onclick="startGame()">REJOUER</button>';
+}
+</script>
+</body>
+</html>
